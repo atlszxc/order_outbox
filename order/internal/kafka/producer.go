@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"github.com/confluentinc/confluent-kafka-go/v2/kafka"
 	"order/internal/storage"
+	"os"
 	"time"
 )
 
@@ -14,7 +15,11 @@ type Producer struct {
 }
 
 func (pr *Producer) Run(ctx context.Context, topic string, limit int) {
-	s, err := storage.InitStorage("postgres://root:postgres@orderdb:5432/order")
+	connStr, exists := os.LookupEnv("DB_CONNECTION")
+	if !exists {
+		panic("No connection sting to db")
+	}
+	s, err := storage.InitStorage(connStr)
 	if err != nil {
 		panic(err)
 	}
@@ -55,16 +60,23 @@ func (pr *Producer) SendMessage(topic string, msg int) {
 	}
 
 	answer := <-delChan
-	z := answer.(*kafka.Message)
-	fmt.Println("kafka")
-	fmt.Println(z.Value)
+	fmt.Println(answer.String())
+
 }
 
 func InitProducer() (*Producer, error) {
+	bootstrapServer, bsExists := os.LookupEnv("KAFKA_BOOTSTRAP_SERVER")
+	group, groupExists := os.LookupEnv("KAFKA_GROUP_ID")
+	reset, resetExists := os.LookupEnv("KAFKA_RESET")
+
+	if !bsExists || !groupExists || !resetExists {
+		panic("No kafka config")
+	}
+
 	producer, err := kafka.NewProducer(&kafka.ConfigMap{
-		"bootstrap.servers": "kafka:9092",
-		"group.id":          "order",
-		"auto.offset.reset": "earliest",
+		"bootstrap.servers": bootstrapServer,
+		"group.id":          group,
+		"auto.offset.reset": reset,
 	})
 
 	if err != nil {

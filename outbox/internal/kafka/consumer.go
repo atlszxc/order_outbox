@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"github.com/confluentinc/confluent-kafka-go/v2/kafka"
+	"os"
 	"outbox/internal/kafka/dtos"
 	"outbox/internal/storage"
 	"strconv"
@@ -15,7 +16,11 @@ type Consumer struct {
 }
 
 func (c *Consumer) Listen(ctx context.Context) {
-	s := storage.GetStorage("postgres://root:postgres@outboxdb:5432/outbox")
+	connStr, exists := os.LookupEnv("DB_CONNECTION")
+	if !exists {
+		panic("No connection sting to db")
+	}
+	s := storage.GetStorage(connStr)
 
 	err := c.C.SubscribeTopics([]string{"order"}, nil)
 	p, producerErr := InitProducer()
@@ -61,10 +66,18 @@ func (c *Consumer) Listen(ctx context.Context) {
 }
 
 func InitConsumer() (*Consumer, error) {
+	bootstrapServer, bsExists := os.LookupEnv("KAFKA_BOOTSTRAP_SERVER")
+	group, groupExists := os.LookupEnv("KAFKA_GROUP_ID")
+	reset, resetExists := os.LookupEnv("KAFKA_RESET")
+
+	if !bsExists || !groupExists || !resetExists {
+		panic("No kafka config")
+	}
+
 	c, err := kafka.NewConsumer(&kafka.ConfigMap{
-		"bootstrap.servers": "kafka:9092",
-		"group.id":          "order",
-		"auto.offset.reset": "earliest",
+		"bootstrap.servers": bootstrapServer,
+		"group.id":          group,
+		"auto.offset.reset": reset,
 	})
 
 	if err != nil {

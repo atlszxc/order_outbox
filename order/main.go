@@ -3,14 +3,27 @@ package main
 import (
 	"context"
 	"fmt"
+	"github.com/joho/godotenv"
+	"log"
 	"order/internal/kafka"
 	"order/internal/order/handler"
 	"order/internal/server"
 	"os"
 )
 
+func init() {
+	if err := godotenv.Load(); err != nil {
+		log.Fatal("No .env file found")
+	}
+}
+
 func main() {
-	s := server.InitServer(":8080", server.DEBUG)
+	port, portExist := os.LookupEnv("PORT")
+	if !portExist {
+		os.Exit(1)
+	}
+
+	s := server.InitServer(port, server.DEBUG)
 
 	consumer, conErr := kafka.InitConsumer()
 	if conErr != nil {
